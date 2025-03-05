@@ -11,7 +11,7 @@ class AppLogger:
 
         log_file = os.path.join(log_dir, "app.log")  # Base filename
         self.logger = logging.getLogger("AppLogger")
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all log levels
 
         # Create a rotating file handler (new file daily)
         handler = TimedRotatingFileHandler(log_file, when="midnight", interval=1, backupCount=7)
