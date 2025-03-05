@@ -54,6 +54,9 @@ Test cases for the script are stored in the `tests` folder. Further testing shou
 
 ## Important Notes
 - Some HL7 fields may contain misplaced data. Please review the code and make any required changes.
+- If running on a version of Python older than 3.9, you will need to change the typing in the ``format_address`` static method argument list from ``list[str]`` to ``List[str]`` (capital L), and add the following import at the top of the ``patientinfo.py`` file: 
+    
+        ``from typing import List``
 
 ## Contact Information
 For any questions regarding this script, please contact David Kennedy or Nicholas Campbell by email at [david.kennedy@cirdan.com](mailto:david.kennedy@cirdan.com) or [nicholas.campbell@cirdan.com](mailto:nicholas.campbell@cirdan.com) respectively, Monday and Wednesday from 9am to 5pm GMT.

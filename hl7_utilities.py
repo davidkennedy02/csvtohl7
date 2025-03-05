@@ -60,14 +60,18 @@ def create_adt_message(patient_info:patientinfo.Patient, event_type:str="A01") -
     """
     event_type = event_type.upper()  # Convert the event type to upper case
 
-    # Construction is halted if return values is None 
-    hl7 = create_message_header("ADT^" + event_type)
-    hl7 = create_evn.create_evn(hl7, event_type=event_type) if hl7 else None
-    hl7 = create_pid.create_pid(patient_info, hl7) if hl7 else None
-    if event_type == "A01":
-        hl7 = create_pv1.create_pv1(hl7) if hl7 else None
+    try:
+        # Construction is halted if return values is None 
+        hl7 = create_message_header("ADT^" + event_type)
+        hl7 = create_evn.create_evn(hl7, event_type=event_type) if hl7 else None
+        hl7 = create_pid.create_pid(patient_info, hl7) if hl7 else None
+        if event_type == "A01":
+            hl7 = create_pv1.create_pv1(hl7) if hl7 else None
 
-    return hl7
+        return hl7
+    except Exception as e:
+        logger.log(f"Error creating ADT message: {e}", "CRITICAL")
+        return None
 
 
 def save_hl7_message_to_file(hl7_message:hl7apy.core.Message, hl7_folder_path:str):
