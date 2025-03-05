@@ -1,4 +1,4 @@
-# CSV to HL7 Processing Script
+# CSV & PAS to HL7 Processing Script
 
 ## Overview
 This script is designed to process CSV and PAS files located within the `input` folder. If one or more files are found, the script reads each file, extracts information contained therein, and creates a `Patient` object. The `Patient` class definition can be found in `patientinfo.py`. An ``ADT^A01`` or ``ADT^A28`` HL7 message will then be constructed using the patient information, along with other details contained in files within the `segments` directory, each named according to the segment of the HL7 message they pertain to. Finally, the HL7 message will be saved as a flat file to the `output_hl7` directory.
