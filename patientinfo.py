@@ -1,4 +1,5 @@
 import datetime
+from typing import List
 from logger import AppLogger
 
 logger = AppLogger()
@@ -208,7 +209,7 @@ class Patient:
         return phone[:20] if phone and phone.isdigit() else None
 
     @staticmethod
-    def format_address(address_list:list[str], max_length:int):
+    def format_address(address_list:List[str], max_length:int):
         """Format address fields, ensuring valid length.
 
         Args:

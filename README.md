@@ -1,7 +1,7 @@
 # CSV to HL7 Processing Script
 
 ## Overview
-This script is designed to process CSV files located within the `input_csv` folder. If one or more CSV files are found, the script reads each file, extracts information contained therein, and creates a `Patient` object. The `Patient` class definition can be found in `patientinfo.py`. An ``ADT^A01`` or ``ADT^A28`` HL7 message will then be constructed using the patient information, along with other details contained in files within the `segments` directory, each named according to the segment of the HL7 message they pertain to. Finally, the HL7 message will be saved as a flat file to the `output_hl7` directory.
+This script is designed to process CSV and PAS files located within the `input` folder. If one or more files are found, the script reads each file, extracts information contained therein, and creates a `Patient` object. The `Patient` class definition can be found in `patientinfo.py`. An ``ADT^A01`` or ``ADT^A28`` HL7 message will then be constructed using the patient information, along with other details contained in files within the `segments` directory, each named according to the segment of the HL7 message they pertain to. Finally, the HL7 message will be saved as a flat file to the `output_hl7` directory.
 
 Please make sure to review the [important notes](#important-notes). 
 
@@ -10,7 +10,7 @@ If you have any questions or queries, please refer to the [contact information](
 ## Project Structure 
 The directory layout should look as follows:
 - CSVTOHL7 (root of directory)
-    - input_csv
+    - input
     - logs
     - output_hl7
     - sample_CSVs
@@ -44,19 +44,16 @@ Once the `Patient` object has been validated, an HL7 message is constructed usin
 Currently, output files are named using a combination of the current date-time and a sequence number to ensure uniqueness.
 
 ## Script Execution
-The main logic of the script is contained within `main.py`. This file also includes a small number of checks to enforce agreed-upon exclusions. To run the script, first ensure that the CSV files you wish to use to generate HL7 messages are found within the `input_csv` folder. Additionally, ensure that the required dependencies have been installed using ``python -m pip install -r requirements.txt``. Following this, simply execute the script with `python main.py`, or a similar command, from the root of the directory. The resulting HL7 messages should appear in the `output_hl7` folder.
+The main logic of the script is contained within `main.py`. This file also includes a small number of checks to enforce agreed-upon exclusions. To run the script, first ensure that the CSV and PAS files you wish to use to generate HL7 messages are found within the `input` folder. Additionally, ensure that the required dependencies have been installed using ``python -m pip install -r requirements.txt``. Following this, simply execute the script with `python main.py`, or a similar command, from the root of the directory. The resulting HL7 messages should appear in the `output_hl7` folder.
 
 ## Logging
-Basic logging is implemented throughout the execution of the script to satisfy requirements regarding notifying the Data Quality team; logs can be found in the `logs` folder. Logging will flag problematic CSV rows by referencing the patient internal number. 
+Basic logging is implemented throughout the execution of the script to satisfy requirements regarding notifying the Data Quality team; logs can be found in the `logs` folder. Logging will flag problematic rows by referencing the patient internal number. 
 
 ## Testing
 Test cases for the script are stored in the `tests` folder. Further testing should be performed to ensure the script functions as necessary, along with the inclusion of robust safety nets and expansive exception-handling try-except-else blocks. 
 
 ## Important Notes
 - Some HL7 fields may contain misplaced data. Please review the code and make any required changes.
-- If running on a version of Python older than 3.9, you will need to change the typing in the ``format_address`` static method argument list from ``list[str]`` to ``List[str]`` (capital L), and add the following import at the top of the ``patientinfo.py`` file: 
-    
-        ``from typing import List``
 
 ## Contact Information
 For any questions regarding this script, please contact David Kennedy or Nicholas Campbell by email at [david.kennedy@cirdan.com](mailto:david.kennedy@cirdan.com) or [nicholas.campbell@cirdan.com](mailto:nicholas.campbell@cirdan.com) respectively, Monday and Wednesday from 9am to 5pm GMT.
