@@ -40,5 +40,6 @@ def create_pid(patient_info:Patient, hl7):
         print(f"Could not create MSH Segment: {e}")
         logger.log(
             f"An error of type {type(e).__name__} occurred. Arguments:\n{e.args}\n\nCould not create MSH segment", "CRITICAL")
+        return None    
     else:
         return hl7

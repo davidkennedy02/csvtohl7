@@ -48,7 +48,7 @@ def create_message_header(messageType):
         
 
 
-def create_adt_message(patient_info:patientinfo.Patient, event_type:str="A01") -> hl7apy.core.Message | None:
+def create_adt_message(patient_info:patientinfo.Patient, event_type:str="A01"):
     """Creates an HL7 ADT message with the specified event type.
 
     Args:
@@ -67,7 +67,10 @@ def create_adt_message(patient_info:patientinfo.Patient, event_type:str="A01") -
         hl7 = create_pid.create_pid(patient_info, hl7) if hl7 else None
         if event_type == "A01":
             hl7 = create_pv1.create_pv1(hl7) if hl7 else None
-
+            
+        if not hl7:
+            logger.log(f"Message construction failed for patient within internal patient" \
+                f" number {patient_info.internal_patient_number}", level="CRITICAL")
         return hl7
     except Exception as e:
         logger.log(f"Error creating ADT message: {e}", "CRITICAL")
