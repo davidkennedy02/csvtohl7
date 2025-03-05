@@ -45,11 +45,38 @@ def process_csv_folder():
             
             # For each CSV file found...
             with open(input_file, newline='', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
+                reader = csv.reader(csvfile)
+                headers = next(reader)  # Read the header row
                 
                 # Extract information from each row in the CSV file, and use it to construct a `Patient` object. 
                 for row in reader:
-                    patient_info = patientinfo.Patient(**row)
+                    patient_info = patientinfo.Patient(
+                        internal_patient_number=row[0],
+                        assigning_authority=row[1],
+                        hospital_case_number=row[2],
+                        nhs_number=row[3],
+                        nhs_verification_status=row[4],
+                        surname=row[5],
+                        forename=row[6],
+                        date_of_birth=row[7],
+                        sex=row[8],
+                        patient_title=row[9],
+                        address_line_1=row[10],
+                        address_line_2=row[11],
+                        address_line_3=row[12],
+                        address_line_4=row[13],
+                        address_line_5=row[14],
+                        postcode=row[15],
+                        death_indicator=row[16],
+                        date_of_death=row[17],
+                        registered_gp_code=row[18],
+                        ethnic_code=row[19],
+                        home_phone=row[20],
+                        work_phone=row[21],
+                        mobile_phone=row[22],
+                        registered_gp=row[23],
+                        registered_practice=row[24]
+                    )
                     
                     # Minor exclusion checks
                     if not patient_info.surname:
