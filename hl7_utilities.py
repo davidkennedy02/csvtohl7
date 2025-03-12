@@ -1,13 +1,15 @@
 from datetime import date, datetime
-import os
+import time  # Add time module for sleep functionality
 from pathlib import Path
 from hl7apy import core
 import hl7apy.core
 from logger import AppLogger
 from segments import create_pid, create_msh, create_evn, create_pv1
 import patientinfo
+import multiprocessing
 
-sequenceNum = 0
+# Replace the global variable with a shared counter
+sequence_counter = multiprocessing.Value('i', 0)
 logger = AppLogger()
 
 def create_control_id():
@@ -73,7 +75,7 @@ def create_adt_message(patient_info:patientinfo.Patient, event_type:str="A01"):
                 f" number {patient_info.internal_patient_number}", level="CRITICAL")
         return hl7
     except Exception as e:
-        logger.log(f"Error creating ADT message: {e}", "CRITICAL")
+        logger.log(f"Error creating ADT message (internal patient number {patient_info.internal_patient_number}): {e}", "CRITICAL")
         return None
 
 
@@ -82,36 +84,119 @@ def save_hl7_message_to_file(hl7_message:hl7apy.core.Message, hl7_folder_path:st
 
     Args:
         hl7_message (hl7apy.core.Message): The HL7 message to save.
-        patient_info (patientinfo.Patient): The patient information.
         hl7_folder_path (str): The folder path to save the HL7 message.
     """
     
-    global sequenceNum
-    sequenceNum += 1
+    # Use the shared counter in a thread-safe way
+    with sequence_counter.get_lock():
+        sequence_counter.value += 1
+        current_sequence = sequence_counter.value
     
     hl7_folder_path = Path(hl7_folder_path)
-    hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.{sequenceNum}.hl7"
-    os.makedirs(os.path.dirname(hl7_file_path), exist_ok=True)
-    with open(hl7_file_path, "w+", newline="") as hl7_file:
-        for child in hl7_message.children:
-            hl7_file.write(child.to_er7() + "\r")
+    hl7_folder_path.mkdir(parents=True, exist_ok=True)
+    hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
+    
+    # Add retry logic for handling temporary resource unavailability
+    max_retries = 5
+    retry_delay = 0.5  # Start with 0.5 seconds delay
+    
+    for attempt in range(max_retries):
+        try:
+            with open(hl7_file_path, "w+", newline="") as hl7_file:
+                for child in hl7_message.children:
+                    hl7_file.write(child.to_er7() + "\r")
+                
+                hl7_file.flush()  # Ensure the content is written to disk.
+                
+                # Move the file pointer to the beginning of the file.
+                hl7_file.seek(0)
+
+                # Read the content from the file.
+                content = hl7_file.read()
+
+                # Replace any CRLF pairs with a single CR (carriage return), and then replace any remaining LF (line feed) with CR.
+                # This ensures that only CR (ASCII 13) is present.
+                new_content = content.replace('\r\n', '\r').replace('\n', '\r')
+
+                # Move back to the beginning of the file and truncate it.
+                hl7_file.seek(0)
+                hl7_file.truncate()
+
+                # Write the normalized content back to the file.
+                hl7_file.write(new_content)
+                hl7_file.flush()  # Optionally flush changes again.
             
-        hl7_file.flush()  # Ensure the content is written to disk.
+            # If we reach here, the file operation was successful
+            logger.log(f"Successfully saved HL7 message to {hl7_file_path}", "INFO")
+            return
+            
+        except BlockingIOError as e:
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                logger.log(f"Attempt {attempt+1}/{max_retries}: Resource temporarily unavailable for {hl7_file_path}. Retrying in {retry_delay} seconds...", "WARNING")
+                time.sleep(retry_delay)
+                # Exponential backoff - increase delay for next attempt
+                retry_delay *= 2
+            else:
+                logger.log(f"Failed to save HL7 message after {max_retries} attempts: {e}", "ERROR")
+                raise  # Re-raise the exception after all retries fail
+        except Exception as e:
+            logger.log(f"Error saving HL7 message: {e}", "ERROR")
+            raise
+
+
+def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
+    """Saves multiple HL7 messages as separate files.
+
+    Args:
+        hl7_messages (list): List of HL7 messages to save
+        hl7_folder_path (str): The folder path to save the HL7 messages
+        batch_id (int or str): Batch identifier (used for logging)
+    """
+    if not hl7_messages:
+        return
         
-        # Move the file pointer to the beginning of the file.
-        hl7_file.seek(0)
-
-        # Read the content from the file.
-        content = hl7_file.read()
-
-        # Replace any CRLF pairs with a single CR (carriage return), and then replace any remaining LF (line feed) with CR.
-        # This ensures that only CR (ASCII 13) is present.
-        new_content = content.replace('\r\n', '\r').replace('\n', '\r')
-
-        # Move back to the beginning of the file and truncate it.
-        hl7_file.seek(0)
-        hl7_file.truncate()
-
-        # Write the normalized content back to the file.
-        hl7_file.write(new_content)
-        hl7_file.flush()  # Optionally flush changes again.
+    hl7_folder_path = Path(hl7_folder_path)
+    # Create the directory using Path.mkdir instead of os.makedirs
+    hl7_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Add retry logic for handling temporary resource unavailability
+    max_retries = 5
+    retry_delay = 0.5  # Start with 0.5 seconds delay
+    
+    # Log the batch processing start with batch ID for better tracking
+    logger.log(f"Starting to save {len(hl7_messages)} messages from batch {batch_id}", "INFO")
+    
+    for message in hl7_messages:
+        # Use the shared counter in a thread-safe way for each message
+        with sequence_counter.get_lock():
+            sequence_counter.value += 1
+            current_sequence = sequence_counter.value
+            
+        # Format: <YYYYMMDDHHMMSS>.<sequenceNum (8 digits)>.hl7
+        hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
+        
+        for attempt in range(max_retries):
+            try:
+                with open(hl7_file_path, "w", newline="") as hl7_file:
+                    for child in message.children:
+                        # Write directly with CR line endings
+                        hl7_file.write(child.to_er7().replace('\r\n', '\r').replace('\n', '\r') + '\r')
+                
+                # If we reach here, the file operation was successful
+                logger.log(f"Successfully saved HL7 message ({current_sequence}) from batch {batch_id} to {hl7_file_path}", "INFO")
+                break
+                
+            except BlockingIOError as e:
+                if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                    logger.log(f"HL7 message ({current_sequence}), Batch {batch_id}, Attempt {attempt+1}/{max_retries}: Resource temporarily unavailable for {hl7_file_path}. Retrying in {retry_delay} seconds...", "WARNING")
+                    time.sleep(retry_delay)
+                    # Exponential backoff - increase delay for next attempt
+                    retry_delay *= 2
+                else:
+                    logger.log(f"HL7 message ({current_sequence}), Batch {batch_id}: Failed to save HL7 message after {max_retries} attempts: {e}", "ERROR")
+                    raise  # Re-raise the exception after all retries fail
+            except Exception as e:
+                logger.log(f"HL7 message ({current_sequence}), Batch {batch_id}: Error saving HL7 message: {e}", "ERROR")
+                raise
+    
+    logger.log(f"Completed saving all messages from batch {batch_id}", "INFO")

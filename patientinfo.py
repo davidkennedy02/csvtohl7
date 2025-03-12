@@ -257,13 +257,15 @@ class Patient:
             logger.log(f"Patient internal number {self.internal_patient_number}: " \
                   f"Death indicator is 'N' but a date of death {self.date_of_death} has been recorded")
 
-
     def __str__(self):
-        """Returns a string representation of the Patient object.
+        """Safe string representation that handles potential encoding issues."""
+        try:
+            name_part = f"{self.forename} {self.surname}" if self.forename and self.surname else "Unknown"
+            dob_part = f"DOB: {self.date_of_birth}" if self.date_of_birth else "No DOB"
+            nhs_part = f"NHS: {self.nhs_number}" if self.nhs_number else "No NHS"
+            
+            return f"Patient({name_part}, {dob_part}, {nhs_part})"
+        except Exception:
+            # Provide a fallback representation that won't cause encoding issues
+            return f"Patient(ID:{self.internal_patient_number or 'Unknown'})"
 
-        Returns:
-            str: A string representation of the Patient object.
-        """
-        return f"Patient({self.forename} {self.surname}, DOB: {self.date_of_birth}, NHS: {self.nhs_number})"
-
-    
