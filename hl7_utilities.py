@@ -145,7 +145,7 @@ def save_hl7_message_to_file(hl7_message:hl7apy.core.Message, hl7_folder_path:st
 
 
 def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
-    """Saves multiple HL7 messages as separate files.
+    """Saves multiple HL7 messages as separate files, organized by patient DOB.
 
     Args:
         hl7_messages (list): List of HL7 messages to save
@@ -155,9 +155,12 @@ def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
     if not hl7_messages:
         return
         
-    hl7_folder_path = Path(hl7_folder_path)
-    # Create the directory using Path.mkdir instead of os.makedirs
-    hl7_folder_path.mkdir(parents=True, exist_ok=True)
+    base_folder_path = Path(hl7_folder_path)
+    base_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    # Create a default folder for messages where DOB can't be extracted
+    default_folder = base_folder_path / "unknown"
+    default_folder.mkdir(parents=True, exist_ok=True)
     
     # Add retry logic for handling temporary resource unavailability
     max_retries = 5
@@ -171,9 +174,33 @@ def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
         with sequence_counter.get_lock():
             sequence_counter.value += 1
             current_sequence = sequence_counter.value
+        
+        # Try to extract DOB from the message
+        try:
+            # Extract DOB from PID.7 segment
+            dob_string = message.pid.pid_7.to_er7()
+            # Parse the DOB (assuming format YYYYMMDD)
+            if len(dob_string) >= 8:
+                year = dob_string[:4]
+                
+                # Create folder using year of birth
+                dob_folder = base_folder_path / year
+                dob_folder.mkdir(parents=True, exist_ok=True)
+                
+                # Use DOB folder for this message
+                target_folder = dob_folder
+                logger.log(f"Organizing message by DOB: {year}", "INFO")
+            else:
+                # Invalid DOB format, use default folder
+                target_folder = default_folder
+                logger.log(f"Invalid DOB format: '{dob_string}', using default folder", "WARNING")
+        except Exception as e:
+            # If any error occurs when extracting DOB, use default folder
+            target_folder = default_folder
+            logger.log(f"Error extracting DOB, using default folder: {e}", "WARNING")
             
         # Format: <YYYYMMDDHHMMSS>.<sequenceNum (8 digits)>.hl7
-        hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
+        hl7_file_path = target_folder / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
         
         for attempt in range(max_retries):
             try:
