@@ -87,14 +87,33 @@ def save_hl7_message_to_file(hl7_message:hl7apy.core.Message, hl7_folder_path:st
         hl7_folder_path (str): The folder path to save the HL7 message.
     """
     
+    # Extract the year of birth
+    try:
+        dob_field = hl7_message.pid.pid_7.to_er7()
+        # Check if DOB field is empty, too short, or contains invalid characters
+        if not dob_field or len(dob_field.strip()) < 4 or not dob_field[:4].isdigit():
+            year_of_birth = "unknown"
+            logger.log(f"Invalid or empty date of birth field: '{dob_field}', using 'unknown' folder", "WARNING")
+        else:
+            year_of_birth = dob_field[0:4]
+    except Exception as e:
+        year_of_birth = "unknown"
+        logger.log(f"Could not extract year of birth: {e}", "WARNING")
+    
     # Use the shared counter in a thread-safe way
     with sequence_counter.get_lock():
         sequence_counter.value += 1
         current_sequence = sequence_counter.value
     
+    # Create base folder if it doesn't exist
     hl7_folder_path = Path(hl7_folder_path)
     hl7_folder_path.mkdir(parents=True, exist_ok=True)
-    hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
+    
+    # Create year of birth subdirectory
+    year_folder_path = hl7_folder_path / year_of_birth
+    year_folder_path.mkdir(parents=True, exist_ok=True)
+    
+    hl7_file_path = year_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
     
     # Add retry logic for handling temporary resource unavailability
     max_retries = 5
@@ -156,7 +175,7 @@ def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
         return
         
     hl7_folder_path = Path(hl7_folder_path)
-    # Create the directory using Path.mkdir instead of os.makedirs
+    # Create the base directory
     hl7_folder_path.mkdir(parents=True, exist_ok=True)
     
     # Add retry logic for handling temporary resource unavailability
@@ -167,13 +186,30 @@ def save_hl7_messages_batch(hl7_messages, hl7_folder_path, batch_id):
     logger.log(f"Starting to save {len(hl7_messages)} messages from batch {batch_id}", "INFO")
     
     for message in hl7_messages:
+        # Extract the year of birth
+        try:
+            dob_field = message.pid.pid_7.to_er7()
+            # Check if DOB field is empty, too short, or contains invalid characters
+            if not dob_field or len(dob_field.strip()) < 4 or not dob_field[:4].isdigit():
+                year_of_birth = "unknown"
+                logger.log(f"Invalid or empty date of birth field: '{dob_field}', using 'unknown' folder", "WARNING")
+            else:
+                year_of_birth = dob_field[0:4]
+        except Exception as e:
+            year_of_birth = "unknown"
+            logger.log(f"Could not extract year of birth: {e}", "WARNING")
+        
+        # Create year of birth subdirectory
+        year_folder_path = hl7_folder_path / year_of_birth
+        year_folder_path.mkdir(parents=True, exist_ok=True)
+            
         # Use the shared counter in a thread-safe way for each message
         with sequence_counter.get_lock():
             sequence_counter.value += 1
             current_sequence = sequence_counter.value
             
         # Format: <YYYYMMDDHHMMSS>.<sequenceNum (8 digits)>.hl7
-        hl7_file_path = hl7_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
+        hl7_file_path = year_folder_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}.{current_sequence:08d}.hl7"
         
         for attempt in range(max_retries):
             try:
